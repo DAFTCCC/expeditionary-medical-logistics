@@ -31,6 +31,8 @@ export interface Person {
    * authentication: logging in never implies medication authority.
    */
   medicationAuthority: boolean;
+  /** Location (usually a HUB or DEPLOYMENT_SITE) the person works from. Drives hub scoping (ADR-008). */
+  homeLocationId?: string;
 }
 
 export type LocationKind = 'HUB' | 'STORAGE' | 'DEPLOYMENT_SITE' | 'KIT';
@@ -42,6 +44,8 @@ export interface Location {
   parentId?: string;
   /** Accountable custodian for a KIT or site, if any. */
   custodianId?: string;
+  /** IANA time zone used for local display at this location (ADR-008). Storage is always UTC. */
+  timeZone?: string;
 }
 
 export type ItemCategory = 'MEDICATION' | 'CONSUMABLE';
