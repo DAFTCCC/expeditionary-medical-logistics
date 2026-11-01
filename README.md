@@ -1,6 +1,6 @@
 # FieldLine
 
-Offline-first medical logistics and readiness management for expeditionary medical teams, with central accountability through the Hawaii logistics hub.
+Offline-first medical logistics and readiness management for expeditionary medical teams, with central accountability through two logistics hubs — Hawaii and Germany (ADR-008).
 
 > **Demonstration project.** All data is fictional. This repository is public — never commit real patient information, medication accountability records, credentials, or deployment details.
 
@@ -12,19 +12,28 @@ What we have · who has it · where it is · what we scanned · what we used · 
 
 Inventory quantities are never stored. Every receipt, issue, consumption, waste, return, transfer and disposal is an immutable event; balances are computed from the event history. This makes "issued" and "consumed" impossible to confuse, gives a complete audit trail by construction, and is the foundation for safe offline synchronization. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
+## Live demo
+
+<https://daftccc.github.io/expeditionary-medical-logistics/> — fictional data, stored only in your browser. Deployed from `main` by `.github/workflows/pages.yml` after tests pass.
+
 ## Repository layout
 
 ```
 src/core/      ledger engine, permissions, GS1 parser, scan identification (no UI dependencies)
-tests/         unit and property tests for the core
+src/demo/      fictional two-hub seed data (Hawaii + Germany)
+src/app/       Phase 1 proof-of-concept UI (React + Vite), IndexedDB storage, camera scanner
+tests/         unit and property tests
 docs/          architecture decisions and implementation status
 ```
 
-## Running the tests
+## Running it
 
 ```bash
-npx tsx --test tests/*.test.ts
-npx tsc -p tsconfig.core.json
+npm install
+npm test            # unit + property tests
+npm run typecheck   # strict TypeScript, core and app
+npm run dev         # local dev server
+npm run build       # production build into dist/
 ```
 
 ## Status

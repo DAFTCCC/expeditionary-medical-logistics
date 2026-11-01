@@ -2,7 +2,7 @@
 
 Levels: **Designed** → **Implemented** → **Unit tested** → **Integration tested** → **Browser tested** → **Device tested** → **Operationally validated**.
 
-_Last updated: 2026-10-31_
+_Last updated: 2026-11-01_
 
 | Capability | Level | Notes |
 |---|---|---|
@@ -20,23 +20,30 @@ _Last updated: 2026-10-31_
 | FieldLine label codes with check character | Unit tested | |
 | Scan resolution order | Unit tested | |
 | FEFO lot recommendation | Unit tested | |
-| POC user interface | Not started | Blocked on packages, see below |
-| Camera scanning | Designed | Needs zxing-wasm |
-| QR / DataMatrix label generation | Designed | Needs a QR library |
-| Handheld scanner (keyboard wedge) | Designed | |
-| IndexedDB persistence | Designed | |
+| Two hubs, Hawaii + Germany (ADR-008) | Unit tested | `tests/seed.test.ts`: scoping, hub-to-hub transfers, enterprise = sum of hubs |
+| Two-hub demo seed | Unit tested | Every seed event accepted; conservation holds for every lot |
+| POC UI: dashboard, inventory by lot/expiry, transactions, equipment custody, labels, history | Browser tested | Headless Chrome against the production build and the live site — see below |
+| Camera scanning (zxing-wasm, bundled WASM) | Browser tested (decoder only) | Decoding verified from an image file in Chrome. **Live camera not tested** — needs a real device |
+| QR label generation | Browser tested | QR rendered, then decoded back by the scanner |
+| DataMatrix label generation | Not started | QR only in Phase 1 |
+| Handheld scanner (keyboard wedge) | Browser tested (simulated keystrokes) | **No physical scanner tested**; GS separator substitutes configurable |
+| IndexedDB persistence | Browser tested | Events survive reload |
+| Offline install (service worker) | Not started | Page must be loaded online once |
+| Quarantine / disposal / discrepancy screens | Not started | Ledger supports them |
 | Server, auth, sync | Designed (ADR-004) | Phase 2–3 |
 
 ## Known limitations / blockers
 
-- **npm registry blocked in the build environment** (2026-10-31). Camera scanning, label generation and the Vite toolchain cannot be installed until `registry.npmjs.org` is allowed.
+- **No authentication.** "Acting as" is a demo switch. Witnesses are selected, not authenticated.
+- **Roles are enterprise-wide.** Per-hub permissions are not enforced (ADR-008).
 - **No server.** Nothing is centrally synchronized; all sync states are `LOCAL`.
-- **Time zones.** Expiry comparisons use the UTC date of the event. A team in UTC+12 recording at 08:00 local on the expiry date is still the previous UTC day — acceptable, but must be reviewed with users.
+- **Time zones.** Expiry comparisons use the UTC date of the event. Hawaii (UTC−10) and Germany (UTC+1/+2) disagree with UTC about "today" for part of each day, so a lot can show as usable or expired a few hours early or late relative to local time. Must be reviewed with users.
 - **Package conversions** (e.g., box of 10 vials → vials) are not yet modeled; quantities are in the catalog item's unit.
 
 ## Decisions
 
 - **Two central hubs: Hawaii and Germany** (confirmed 2026-11-01). See ADR-008.
+- **Reorder points are per hub.** The enterprise view flags an item if it is below its reorder point at either hub.
 
 ## Open questions
 
