@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
   pages: write
   id-token: write
 
@@ -41,5 +42,20 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      # While the repository's Pages source is "Deploy from a branch", GitHub also runs its own
+      # Jekyll build of main on every push, and whichever deploy finishes last is what is served.
+      # Wait for that build so this app is deployed after it. Once the Pages source is switched to
+      # "GitHub Actions" (Settings → Pages), the legacy build stops and this step exits quickly.
+      - name: Wait for GitHub's legacy Pages build of this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for i in $(seq 1 60); do
+            s=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$GITHUB_SHA" --jq '[.workflow_runs[] | select(.name == "pages build and deployment")] | if length == 0 then "none" elif all(.status == "completed") then "done" else "running" end')
+            echo "legacy pages build: $s"
+            if [ "$s" = "done" ]; then break; fi
+            if [ "$s" = "none" ] && [ "$i" -ge 6 ]; then break; fi
+            sleep 10
+          done
       - id: deployment
         uses: actions/deploy-pages@v4
