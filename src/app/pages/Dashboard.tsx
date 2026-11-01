@@ -52,7 +52,7 @@ export function DashboardPage() {
         <Section title="Needs attention">
           <ul className="list">
             {d.lotsExpiredWithStock.map((l) => (
-              <li key={l.lot.id}><a href={href(`lot/${l.lot.id}`)}>{l.item.name} · lot {l.lot.lotNumber}</a> <ExpiryBadge lot={l.lot} /> <span className="sub">{l.onHand} {unitLabel(l.item.unit, l.onHand)} on hand — quarantine and dispose</span></li>
+              <li key={l.lot.id}><a href={href(`lot/${l.lot.id}`)}>{l.item.name} · lot {l.lot.lotNumber}</a> <ExpiryBadge lot={l.lot} /> <span className="sub">{l.onHand} {unitLabel(l.item.unit, l.onHand)} on hand</span>{' '}{l.holders.filter((h) => h.bucket === 'AVAILABLE').slice(0, 1).map((h) => <a key={h.holderId} className="btn small" href={href('act/quarantine', { lot: l.lot.id, from: h.holderId, qty: String(h.qty), reason: 'Expired' })}>Quarantine</a>)}</li>
             ))}
             {d.itemsBelowReorder.map((i) => (
               <li key={i.item.id}><strong>{i.item.name}</strong> <span className="badge warn">Low</span> <span className="sub">{scope === 'ALL' ? `low at ${i.lowAt.map((h) => L.locationName(h)).join(' and ')}` : `${i.available} usable ${unitLabel(i.item.unit, i.available)}`}; reorder point {i.item.reorderPoint} per hub</span></li>

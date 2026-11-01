@@ -119,3 +119,15 @@ describe('Scan resolution', () => {
     assert.equal(fefoLot(p, 'ond', 'HUB', '2026-10-31')?.id, 'L9');
   });
 });
+
+describe('GS1 bracket form with symbology identifier (camera DataMatrix output)', () => {
+  it('parses ]d2(01)…(17)…(10)…(21)…', async () => {
+    const { parseGS1 } = await import('../src/core/gs1');
+    const g = parseGS1(']d2(01)02000000010014(17)281231(10)NEWLOT9(21)SN1');
+    assert.equal(g.ok, true);
+    assert.equal(g.gtin, '02000000010014');
+    assert.equal(g.lot, 'NEWLOT9');
+    assert.equal(g.serial, 'SN1');
+    assert.equal(g.expiry, '2028-12-31');
+  });
+});

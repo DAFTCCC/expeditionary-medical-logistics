@@ -128,6 +128,12 @@ export function LotPage({ lotId }: { lotId: string }) {
             <a className="btn" href={href('act/return', { lot: lotId, person: actorId })}>Return</a>
           </>
         )}
+        {rows.filter((r) => r.bucket === 'AVAILABLE').slice(0, 1).map((r) => (
+          <a key={'q' + r.holderId} className="btn secondary" href={href('act/quarantine', { lot: lotId, from: r.holderId })}>Quarantine</a>
+        ))}
+        {rows.filter((r) => r.bucket === 'QUARANTINE').map((r) => (
+          <a key={'d' + r.holderId} className="btn secondary" href={href('act/dispose', { lot: lotId, from: r.holderId })}>Dispose ({r.qty} quarantined)</a>
+        ))}
         <a className="btn secondary" href={href('labels', { type: 'LOT', target: lotId })}>Label</a>
       </div>
       <div className="grid2">

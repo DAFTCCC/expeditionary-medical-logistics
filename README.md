@@ -16,6 +16,8 @@ Inventory quantities are never stored. Every receipt, issue, consumption, waste,
 
 <https://daftccc.github.io/expeditionary-medical-logistics/> — fictional data, stored only in your browser. Deployed from `main` by `.github/workflows/pages.yml` after tests pass.
 
+Field testing: see [docs/FIELD-TEST.md](docs/FIELD-TEST.md).
+
 ## Repository layout
 
 ```
@@ -23,6 +25,7 @@ src/core/      ledger engine, permissions, GS1 parser, scan identification (no U
 src/demo/      fictional two-hub seed data (Hawaii + Germany)
 src/app/       Phase 1 proof-of-concept UI (React + Vite), IndexedDB storage, camera scanner
 tests/         unit and property tests
+e2e/           scripted browser tests (Playwright)
 docs/          architecture decisions and implementation status
 ```
 

@@ -452,6 +452,35 @@ export function apply(p: Projection, refData: ReferenceData, e: LedgerEvent): Ap
   return { status: 'ACCEPTED' };
 }
 
+/**
+ * Rebuild from events that were already accepted on this device (e.g. loading
+ * from storage). They are committed as recorded, without re-checking them
+ * against today's reference data: an event that was valid when it happened
+ * stays in the history even if someone's authority or an item's rules have
+ * changed since. Only structural problems (unknown lot/return/shipment) are
+ * refused, because committing them would corrupt the projection.
+ */
+export function replay(events: Iterable<LedgerEvent>): Projection {
+  const p = emptyProjection();
+  for (const e of events) {
+    if (p.eventIds.has(e.id)) continue;
+    const broken =
+      ('lotId' in e && !p.lots.has(e.lotId)) ||
+      (e.type === 'RETURN_ACCEPT' && !p.returns.has(e.returnEventId)) ||
+      (e.type === 'TRANSFER_RECEIVE' && !p.shipments.has(e.shipEventId)) ||
+      ((e.type === 'ASSET_ASSIGN' || e.type === 'ASSET_CONFIRM' || e.type === 'ASSET_STATUS') && !p.assets.has(e.assetId)) ||
+      (e.type === 'LABEL_RETIRE' && !p.labels.has(e.code));
+    if (broken) {
+      p.rejected.push({ event: e, reason: 'Refers to a record that does not exist in this history.' });
+      continue;
+    }
+    commit(p, e);
+    p.events.push(e);
+    p.eventIds.add(e.id);
+  }
+  return p;
+}
+
 /** Rebuild the full projection from scratch. */
 export function project(refData: ReferenceData, events: Iterable<LedgerEvent>): Projection {
   const p = emptyProjection();

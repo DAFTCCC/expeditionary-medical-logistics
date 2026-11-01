@@ -201,3 +201,29 @@ describe('Property: random valid sequences always conserve units', () => {
     }
   });
 });
+
+describe('replay of stored history', () => {
+  it('keeps events that were valid when recorded after reference data changes', async () => {
+    const { replay, project, qty } = await import('../src/core/ledger');
+    const { ref, ev, lotOND } = await import('./fixtures');
+    const events = [
+      ev('RECEIVE', { actorId: 'hub', lot: lotOND, qty: 10, toLocationId: 'HUB', source: 'PO' }),
+      ev('ISSUE', { actorId: 'hub', lotId: lotOND.id, qty: 4, fromLocationId: 'HUB', toPersonId: 'prov', purpose: 'x' }),
+    ];
+    const revoked = { ...ref, people: ref.people.map((x) => (x.id === 'prov' ? { ...x, medicationAuthority: false } : x)) };
+    // Re-validating against today's rules would drop the issue...
+    assert.equal(project(revoked, events).events.length, 1);
+    // ...replay keeps the recorded history intact.
+    const p = replay(events);
+    assert.equal(p.events.length, 2);
+    assert.equal(qty(p, lotOND.id, 'CUSTODY', 'prov'), 4);
+  });
+
+  it('refuses structurally broken events without corrupting balances', async () => {
+    const { replay } = await import('../src/core/ledger');
+    const { ev } = await import('./fixtures');
+    const p = replay([ev('CONSUME', { actorId: 'prov', lotId: 'nope', qty: 1, personId: 'prov', context: 'TRAINING' })]);
+    assert.equal(p.events.length, 0);
+    assert.equal(p.rejected.length, 1);
+  });
+});

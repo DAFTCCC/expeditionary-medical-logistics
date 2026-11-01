@@ -84,6 +84,7 @@ export function useRecorder() {
   const [outcome, setOutcome] = useState<Outcome>(null);
   const [busy, setBusy] = useState(false);
   const record = async (fields: NewEvent): Promise<boolean> => {
+    setOutcome(null); // never leave the previous verdict on screen while a new one is pending
     setBusy(true);
     const res: ApplyResult & { event?: LedgerEvent } = await store.record(actorId, fields);
     setBusy(false);

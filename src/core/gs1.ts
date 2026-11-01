@@ -106,7 +106,8 @@ function readAI(s: string, i: number): string | null {
 
 export function parseGS1(input: string, opts: { separator?: string; now?: Date } = {}): GS1Result {
   const out: GS1Result = { ok: false, elements: {}, errors: [] };
-  let s = input.trim();
+  // Symbology identifier (]d2 DataMatrix, ]C1 GS1-128, ]Q3 QR, ]e0 DataBar) may precede either form.
+  let s = input.trim().replace(/^\][A-Za-z]\d/, '');
 
   if (/^\(\d{2,4}\)/.test(s)) {
     // Human-readable form: split on parentheses.
@@ -114,7 +115,6 @@ export function parseGS1(input: string, opts: { separator?: string; now?: Date }
     let m: RegExpExecArray | null;
     while ((m = re.exec(s))) out.elements[m[1]] = m[2];
   } else {
-    s = s.replace(/^\][A-Za-z]\d/, ''); // symbology identifier
     if (opts.separator) s = s.split(opts.separator).join(GS);
     let i = 0;
     while (i < s.length) {

@@ -15,6 +15,9 @@ const ACTIONS: [string, string][] = [
   ['receive', 'Receive'],
   ['ship', 'Ship transfer'],
   ['transfer-receive', 'Receive transfer'],
+  ['quarantine', 'Quarantine'],
+  ['dispose', 'Dispose'],
+  ['missing', 'Report missing'],
 ];
 
 export function ActPage({ action = 'issue', params }: { action?: string; params: URLSearchParams }) {
@@ -41,6 +44,9 @@ export function ActPage({ action = 'issue', params }: { action?: string; params:
         {action === 'receive' && <ReceiveForm params={params} />}
         {action === 'ship' && <ShipForm params={params} />}
         {action === 'transfer-receive' && <TransferReceiveForm params={params} />}
+        {action === 'quarantine' && <LocationStockForm kind="QUARANTINE" params={params} />}
+        {action === 'missing' && <LocationStockForm kind="DISCREPANCY" params={params} />}
+        {action === 'dispose' && <DisposeForm params={params} />}
       </div>
     </>
   );
@@ -442,6 +448,105 @@ function TransferReceiveForm({ params }: { params: URLSearchParams }) {
             <input type="number" inputMode="numeric" min={0} step={1} value={n} onChange={(e) => setN(e.target.value)} required />
           </Field>
           <Submit busy={busy} label="Record receipt" />
+        </>
+      )}
+      <OutcomeBanner outcome={outcome} onClose={() => setOutcome(null)} />
+    </form>
+  );
+}
+
+// ------------------------------------------------- quarantine / missing
+
+function LocationStockForm({ kind, params }: { kind: 'QUARANTINE' | 'DISCREPANCY'; params: URLSearchParams }) {
+  const { p, L } = useStore();
+  const { scope } = useSession();
+  const lotLabel = useLotLabel();
+  const { record, outcome, setOutcome, busy } = useRecorder();
+  const sources = L.locationsInScope(scope).filter((l) => [...p.lots.keys()].some((id) => qty(p, id, 'AVAILABLE', l.id) > 0));
+  const [loc, setLoc] = useState(params.get('from') ?? sources[0]?.id ?? '');
+  const lotsHere = [...p.lots.values()].filter((l) => qty(p, l.id, 'AVAILABLE', loc) > 0).sort((a, b) => a.expiry.localeCompare(b.expiry));
+  const [lotId, setLotId] = useState(params.get('lot') ?? '');
+  const lot = p.lots.get(lotId);
+  const [n, setN] = useState(params.get('qty') ?? '1');
+  const [reason, setReason] = useState(params.get('reason') ?? '');
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (kind === 'QUARANTINE') {
+      if (!reason.trim()) return setOutcome({ ok: false, text: 'Give a reason for quarantine.' });
+      await record({ type: 'QUARANTINE', lotId, qty: Number(n), locationId: loc, reason: reason.trim() });
+    } else {
+      await record({ type: 'DISCREPANCY', lotId, qty: Number(n), locationId: loc, note: reason.trim() || undefined });
+    }
+  };
+  const q = kind === 'QUARANTINE';
+  return (
+    <form onSubmit={submit}>
+      <h2>{q ? 'Quarantine stock' : 'Report stock missing'}</h2>
+      <p className="sub">{q
+        ? 'Moves available units to quarantine at the same location. Quarantined stock cannot be issued; it can later be disposed.'
+        : 'Use when a count finds fewer units than the system shows. The units move to “missing” for investigation — they are not deleted.'}</p>
+      <Field label="Location">
+        <select value={loc} onChange={(e) => { setLoc(e.target.value); setLotId(''); setOutcome(null); }} required>
+          <option value="">— choose —</option>
+          {sources.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
+          {loc && !sources.some((x) => x.id === loc) && <option value={loc}>{L.locationName(loc)}</option>}
+        </select>
+      </Field>
+      <Field label="Lot">
+        <select value={lotId} onChange={(e) => setLotId(e.target.value)} required>
+          <option value="">— choose —</option>
+          {lotsHere.map((l) => <option key={l.id} value={l.id}>{lotLabel(l.id, ` · ${qty(p, l.id, 'AVAILABLE', loc)} avail`)}</option>)}
+        </select>
+      </Field>
+      <QtyField value={n} onChange={setN} max={lot ? qty(p, lot.id, 'AVAILABLE', loc) : undefined} />
+      <Field label={q ? 'Reason' : 'Note (optional)'}>
+        <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder={q ? 'e.g. Expired, damaged packaging, recall' : 'e.g. Cycle count 2026-11-01'} required={q} />
+      </Field>
+      <Submit busy={busy} label={q ? 'Quarantine' : 'Report missing'} />
+      <OutcomeBanner outcome={outcome} onClose={() => setOutcome(null)} />
+    </form>
+  );
+}
+
+function DisposeForm({ params }: { params: URLSearchParams }) {
+  const { p, L } = useStore();
+  const { scope } = useSession();
+  const lotLabel = useLotLabel();
+  const { record, outcome, setOutcome, busy } = useRecorder();
+  const held: { lotId: string; loc: string; n: number }[] = [];
+  for (const [k, v] of p.balances) {
+    const [lotId, b, loc] = k.split('|');
+    if (b === 'QUARANTINE' && v > 0 && L.inScope(scope, L.hubOfLocation(loc))) held.push({ lotId, loc, n: v });
+  }
+  const [sel, setSel] = useState(params.get('lot') && params.get('from') ? `${params.get('lot')}|${params.get('from')}` : held[0] ? `${held[0].lotId}|${held[0].loc}` : '');
+  const [lotId, loc] = sel.split('|');
+  const cur = held.find((h) => h.lotId === lotId && h.loc === loc);
+  const [n, setN] = useState(String(cur?.n ?? 1));
+  const [method, setMethod] = useState('');
+  const [witness, setWitness] = useState('');
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!method.trim()) return setOutcome({ ok: false, text: 'Describe the disposal method.' });
+    const ok = await record({ type: 'DISPOSE', lotId, qty: Number(n), locationId: loc, method: method.trim(), witnessId: witness || undefined });
+    if (ok) { setMethod(''); setWitness(''); }
+  };
+  return (
+    <form onSubmit={submit}>
+      <h2>Dispose of quarantined stock</h2>
+      <p className="sub">Only quarantined units can be disposed, and disposal always needs an independent witness. The units leave inventory permanently; the record stays.</p>
+      {held.length === 0 ? <p className="empty">Nothing is in quarantine in this scope. Quarantine stock first (Transact → Quarantine).</p> : (
+        <>
+          <Field label="Quarantined stock">
+            <select value={sel} onChange={(e) => { setSel(e.target.value); const [a, b] = e.target.value.split('|'); setN(String(held.find((h) => h.lotId === a && h.loc === b)?.n ?? 1)); setOutcome(null); }} required>
+              {held.map((h) => <option key={`${h.lotId}|${h.loc}`} value={`${h.lotId}|${h.loc}`}>{h.n} × {lotLabel(h.lotId)} — {L.locationName(h.loc)}</option>)}
+            </select>
+          </Field>
+          <QtyField value={n} onChange={setN} max={cur?.n} />
+          <Field label="Method"><input value={method} onChange={(e) => setMethod(e.target.value)} placeholder="e.g. Returned to reverse distributor, pharmaceutical waste bin" required /></Field>
+          <WitnessField value={witness} onChange={setWitness} required />
+          <Submit busy={busy} label="Record disposal" />
         </>
       )}
       <OutcomeBanner outcome={outcome} onClose={() => setOutcome(null)} />

@@ -2,7 +2,7 @@
 
 Levels: **Designed** → **Implemented** → **Unit tested** → **Integration tested** → **Browser tested** → **Device tested** → **Operationally validated**.
 
-_Last updated: 2026-11-01_
+_Last updated: 2026-11-01 (field-test build)_
 
 | Capability | Level | Notes |
 |---|---|---|
@@ -25,11 +25,13 @@ _Last updated: 2026-11-01_
 | POC UI: dashboard, inventory by lot/expiry, transactions, equipment custody, labels, history | Browser tested (local) | Headless Chrome, 25 scripted workflow steps against the production build served locally. The live GitHub Pages site has **not** been opened by a browser yet |
 | Camera scanning (zxing-wasm, bundled WASM) | Browser tested (decoder only) | Decoding verified from an image file in Chrome. **Live camera not tested** — needs a real device |
 | QR label generation | Browser tested | QR rendered, then decoded back by the scanner |
-| DataMatrix label generation | Not started | QR only in Phase 1 |
+| DataMatrix label generation (incl. GS1) | Browser tested (local) | Generated, then decoded by the camera reader |
 | Handheld scanner (keyboard wedge) | Browser tested (simulated keystrokes) | **No physical scanner tested**; GS separator substitutes configurable |
 | IndexedDB persistence | Browser tested | Events survive reload |
-| Offline install (service worker) | Not started | Page must be loaded online once |
-| Quarantine / disposal / discrepancy screens | Not started | Ledger supports them |
+| Offline install (service worker + manifest) | Browser tested (local) | Pre-caches all files incl. both WASM; reload and transact with network off verified in headless Chrome. Not yet verified on iOS/Android devices |
+| Quarantine / witnessed disposal / missing-report screens | Browser tested (local) | |
+| Own field-test data: start blank, edit items/locations/people, register equipment | Unit + browser tested (local) | Reference edits never rewrite history (core `replay()`) |
+| Backup export / restore | Browser tested (local) | Replaces device data; no merge |
 | Server, auth, sync | Designed (ADR-004) | Phase 2–3 |
 
 ## Known limitations / blockers

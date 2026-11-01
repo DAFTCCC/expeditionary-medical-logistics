@@ -1,8 +1,9 @@
 import { useSyncExternalStore } from 'react';
-import { apply, emptyProjection, project, validate, type ApplyResult, type Projection } from '../core/ledger';
+import { apply, emptyProjection, project, replay, validate, type ApplyResult, type Projection } from '../core/ledger';
 import type { LedgerEvent, ReferenceData } from '../core/types';
 import { buildSeed } from '../demo/seed';
 import { Lookup } from './model';
+import { blankReference, validateReference, type BlankSetup } from './reference';
 
 /**
  * Browser persistence for the POC (ADR-006: IndexedDB).
@@ -19,8 +20,12 @@ const DB_VERSION = 1;
 
 export type NewEvent = { [K in LedgerEvent['type']]: Omit<Extract<LedgerEvent, { type: K }>, 'id' | 'at' | 'deviceId' | 'sync' | 'actorId'> }[LedgerEvent['type']];
 
+export type DataMode = 'demo' | 'own';
+
 export interface Snapshot {
   ready: boolean;
+  /** 'demo' = fictional seed; 'own' = the user's field-test data. */
+  mode: DataMode;
   error?: string;
   persistent: boolean; // false → IndexedDB unavailable, running in memory only
   ref: ReferenceData;
@@ -76,7 +81,7 @@ class Store {
 
   constructor() {
     const ref: ReferenceData = { people: [], locations: [], items: [] };
-    this.snap = { ready: false, persistent: false, ref, L: new Lookup(ref), p: emptyProjection(), version: 0, deviceId: '' };
+    this.snap = { ready: false, mode: 'demo', persistent: false, ref, L: new Lookup(ref), p: emptyProjection(), version: 0, deviceId: '' };
   }
 
   subscribe = (fn: () => void) => {
@@ -94,58 +99,103 @@ class Store {
     try {
       this.db = await openDB();
       const tx = this.db.transaction(['meta', 'events'], 'readonly');
-      const [refRow, devRow, seededRow, rows] = await Promise.all([
+      const [refRow, devRow, seededRow, modeRow, rows] = await Promise.all([
         req(tx.objectStore('meta').get('ref')),
         req(tx.objectStore('meta').get('deviceId')),
         req(tx.objectStore('meta').get('seededAt')),
+        req(tx.objectStore('meta').get('mode')),
         req(tx.objectStore('events').getAll()),
       ]);
       if (!refRow) return this.seed();
       const ref = refRow.v as ReferenceData;
       const events = (rows as { seq: number; e: LedgerEvent }[]).sort((a, b) => a.seq - b.seq).map((r) => r.e);
-      const p = project(ref, events);
+      // Stored events were accepted when recorded; replay them as history (see core replay()).
+      const p = replay(events);
       this.set({
-        ready: true, persistent: true, ref, L: new Lookup(ref), p,
+        ready: true, persistent: true, mode: (modeRow?.v as DataMode) ?? 'demo', ref, L: new Lookup(ref), p,
         deviceId: devRow?.v ?? 'unknown', seededAt: seededRow?.v,
-        error: p.rejected.length ? `${p.rejected.length} stored event(s) failed validation on reload.` : undefined,
+        error: p.rejected.length ? `${p.rejected.length} stored event(s) could not be replayed.` : undefined,
       });
     } catch (err) {
       // Private browsing or storage disabled: run the demo in memory so it is still usable.
       const { ref, events } = buildSeed();
       this.db = undefined;
       this.set({
-        ready: true, persistent: false, ref, L: new Lookup(ref), p: project(ref, events),
+        ready: true, persistent: false, mode: 'demo', ref, L: new Lookup(ref), p: project(ref, events),
         deviceId: `mem-${uuid().slice(0, 8)}`, seededAt: new Date().toISOString(),
         error: `Browser storage unavailable (${(err as Error).message}). Changes will be lost when you close this tab.`,
       });
     }
   }
 
-  /** Wipe and re-seed the demo data. */
-  async seed(): Promise<void> {
-    const now = new Date();
-    const { ref, events } = buildSeed(now);
+  /** Replace everything on this device with the given dataset. */
+  private async replaceAll(ref: ReferenceData, events: LedgerEvent[], mode: DataMode): Promise<void> {
+    const now = new Date().toISOString();
     const deviceId = this.snap.deviceId || `dev-${uuid().slice(0, 8)}`;
-    if (!this.db) this.db = await openDB();
-    const tx = this.db.transaction(['meta', 'events'], 'readwrite');
-    const ev = tx.objectStore('events');
-    const meta = tx.objectStore('meta');
-    ev.clear();
-    meta.put({ k: 'ref', v: ref });
-    meta.put({ k: 'deviceId', v: deviceId });
-    meta.put({ k: 'seededAt', v: now.toISOString() });
-    for (const e of events) ev.add({ e });
-    await txDone(tx);
-    this.set({ ready: true, persistent: true, ref, L: new Lookup(ref), p: project(ref, events), deviceId, seededAt: now.toISOString(), error: undefined });
+    const p = replay(events);
+    if (this.snap.persistent || !this.snap.ready) {
+      if (!this.db) this.db = await openDB();
+      const tx = this.db.transaction(['meta', 'events'], 'readwrite');
+      const ev = tx.objectStore('events');
+      const meta = tx.objectStore('meta');
+      ev.clear();
+      meta.put({ k: 'ref', v: ref });
+      meta.put({ k: 'deviceId', v: deviceId });
+      meta.put({ k: 'seededAt', v: now });
+      meta.put({ k: 'mode', v: mode });
+      for (const e of p.events) ev.add({ e });
+      await txDone(tx);
+    }
+    this.set({ ready: true, persistent: this.snap.persistent || !this.snap.ready, mode, ref, L: new Lookup(ref), p, deviceId, seededAt: now, error: undefined });
+  }
+
+  /** Wipe and load the fictional demo data. */
+  async seed(): Promise<void> {
+    const { ref, events } = buildSeed(new Date());
+    await this.replaceAll(ref, events, 'demo');
   }
 
   async reset(): Promise<void> {
-    if (!this.snap.persistent) {
-      const { ref, events } = buildSeed();
-      this.set({ ref, L: new Lookup(ref), p: project(ref, events), seededAt: new Date().toISOString() });
-      return;
-    }
     await this.seed();
+  }
+
+  /** Wipe and start an empty dataset for the user's own field test. */
+  async startBlank(setup: BlankSetup): Promise<string | null> {
+    const ref = blankReference(setup);
+    const err = validateReference(ref);
+    if (err) return err;
+    await this.replaceAll(ref, [], 'own');
+    return null;
+  }
+
+  /** Save edited people / locations / items. Recorded history is never rewritten. */
+  async saveReference(ref: ReferenceData): Promise<string | null> {
+    const err = validateReference(ref, this.snap.p.events);
+    if (err) return err;
+    if (this.db) {
+      try {
+        const tx = this.db.transaction('meta', 'readwrite');
+        tx.objectStore('meta').put({ k: 'ref', v: ref });
+        await txDone(tx);
+      } catch (e) {
+        return `Could not save to this device: ${(e as Error).message}`;
+      }
+    }
+    this.set({ ref, L: new Lookup(ref) });
+    return null;
+  }
+
+  /** Restore a ledger export (from this or another device). Replaces everything here. */
+  async importLedger(json: string): Promise<string | null> {
+    let data: { format?: string; reference?: ReferenceData; events?: LedgerEvent[]; demo?: boolean; mode?: DataMode };
+    try { data = JSON.parse(json); } catch { return 'That file is not valid JSON.'; }
+    if (data.format !== 'fieldline-ledger-export' || !data.reference || !Array.isArray(data.events)) return 'That file is not a FieldLine ledger export.';
+    const err = validateReference(data.reference, data.events);
+    if (err) return `The export's reference data is inconsistent: ${err}`;
+    const p = replay(data.events);
+    if (p.rejected.length) return `${p.rejected.length} event(s) in the file refer to records that do not exist; nothing was imported.`;
+    await this.replaceAll(data.reference, data.events, data.mode ?? (data.demo ? 'demo' : 'own'));
+    return null;
   }
 
   /** Validate → persist → apply. Returns the ledger's verdict. */
@@ -170,7 +220,7 @@ class Store {
   exportLedger(): string {
     return JSON.stringify({
       format: 'fieldline-ledger-export', version: 1, exportedAt: new Date().toISOString(),
-      deviceId: this.snap.deviceId, demo: true, reference: this.snap.ref, events: this.snap.p.events,
+      deviceId: this.snap.deviceId, mode: this.snap.mode, demo: this.snap.mode === 'demo', reference: this.snap.ref, events: this.snap.p.events,
     }, null, 2);
   }
 }

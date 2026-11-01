@@ -9,5 +9,5 @@
     "types": ["node"],
     "lib": ["ES2022", "DOM"]
   },
-  "include": ["src/core", "src/demo", "src/app/model.ts", "tests"]
+  "include": ["src/core", "src/demo", "src/app/model.ts", "src/app/reference.ts", "tests"]
 }
