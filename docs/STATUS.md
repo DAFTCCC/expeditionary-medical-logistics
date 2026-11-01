@@ -22,7 +22,7 @@ _Last updated: 2026-11-01_
 | FEFO lot recommendation | Unit tested | |
 | Two hubs, Hawaii + Germany (ADR-008) | Unit tested | `tests/seed.test.ts`: scoping, hub-to-hub transfers, enterprise = sum of hubs |
 | Two-hub demo seed | Unit tested | Every seed event accepted; conservation holds for every lot |
-| POC UI: dashboard, inventory by lot/expiry, transactions, equipment custody, labels, history | Browser tested | Headless Chrome against the production build and the live site — see below |
+| POC UI: dashboard, inventory by lot/expiry, transactions, equipment custody, labels, history | Browser tested (local) | Headless Chrome, 25 scripted workflow steps against the production build served locally. The live GitHub Pages site has **not** been opened by a browser yet |
 | Camera scanning (zxing-wasm, bundled WASM) | Browser tested (decoder only) | Decoding verified from an image file in Chrome. **Live camera not tested** — needs a real device |
 | QR label generation | Browser tested | QR rendered, then decoded back by the scanner |
 | DataMatrix label generation | Not started | QR only in Phase 1 |
@@ -33,6 +33,8 @@ _Last updated: 2026-11-01_
 | Server, auth, sync | Designed (ADR-004) | Phase 2–3 |
 
 ## Known limitations / blockers
+
+- **GitHub Pages source is still "Deploy from a branch".** GitHub's own Jekyll build of `main` runs on every push alongside the app deploy; the workflow waits for it and deploys afterwards, so for a minute after each push the site may show a blank page. Switching Settings → Pages → Source to **GitHub Actions** removes the race.
 
 - **No authentication.** "Acting as" is a demo switch. Witnesses are selected, not authenticated.
 - **Roles are enterprise-wide.** Per-hub permissions are not enforced (ADR-008).
