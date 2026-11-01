@@ -34,8 +34,12 @@ _Last updated: 2026-10-31_
 - **Time zones.** Expiry comparisons use the UTC date of the event. A team in UTC+12 recording at 08:00 local on the expiry date is still the previous UTC day — acceptable, but must be reviewed with users.
 - **Package conversions** (e.g., box of 10 vials → vials) are not yet modeled; quantities are in the catalog item's unit.
 
+## Decisions
+
+- **Two central hubs: Hawaii and Germany** (confirmed 2026-11-01). See ADR-008.
+
 ## Open questions
 
-1. How many central hubs? The master prompt names Hawaii; the project description says two. Hubs are modeled as a location kind, so any number works.
+1. Which hub supports which deployments — fixed by region, or either hub can supply any team?
 2. Which items require witnessed issue/waste in your operations (controlled substances, high-cost items)?
 3. Which handheld scanner models are in use, and can they be configured to send the GS1 group separator?
