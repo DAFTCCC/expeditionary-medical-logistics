@@ -139,6 +139,8 @@ with sync_playwright() as pw:
         field('Name').fill('Team Alpha site')
         field('Kind').select_option('DEPLOYMENT_SITE')
         field('Inside').select_option(label='Germany Hub')
+        page.wait_for_timeout(300)
+        field('Country (for the map)').fill('Poland')
         page.click('button:has-text("Add location"):not(.small)')
         t2 = banner(); assert t2.startswith('Saved'), t2
         return t + ' / ' + t2
@@ -199,6 +201,18 @@ with sync_playwright() as pw:
         h = page.locator('.result h2').inner_text(); assert 'Saline' in h, h
         return f'scanned own product barcode → {h}'
     step('Own data: product barcode resolves to own item', scan_own_product)
+
+    def own_map():
+        nav('map'); page.wait_for_selector('svg.worldmap .pin', timeout=15000)
+        labels = sorted(page.eval_on_selector_all('text.pin-label', 'els => els.map(e => e.textContent)'))
+        assert labels == ['Germany', 'Poland', 'United States'], labels
+        assert page.locator('path.link').count() == 1, 'transit line Hawaii → Poland site missing'
+        page.locator('text.pin-label', has_text='Poland').locator('xpath=..').click()
+        panel = page.locator('section.card', has=page.locator('h2', has_text='Poland')).inner_text()
+        assert 'Team Alpha site' in panel and '10 units in transit' in panel, panel
+        page.screenshot(path=f'{OUT}/13-own-map.png')
+        return f'pins {labels}; Hawaii → Poland transit line; panel shows 10 inbound'
+    step('Map: own data pins at country level with transit line', own_map)
 
     def edit_authority_keeps_history():
         n = events()

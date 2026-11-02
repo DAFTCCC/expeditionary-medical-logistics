@@ -108,3 +108,32 @@ describe('two-hub demo seed (ADR-008)', () => {
     assert.match(res.rejected[0].reason, /expired/);
   });
 });
+
+describe('country-level map (ADR-009)', () => {
+  it('locations inherit their country from the nearest ancestor', () => {
+    assert.equal(L.countryOf('HI-PHARM'), 'United States of America');
+    assert.equal(L.countryOf('KIT-KOA-1'), 'Philippines');
+    assert.equal(L.countryOf('DE-WH'), 'Germany');
+  });
+
+  it('pins add up to the same stock as the inventory, per scope', async () => {
+    const { mapData, inventory } = await import('../src/app/model');
+    for (const scope of ['ALL', HUB_HI, HUB_DE]) {
+      const m = mapData(p, L, scope, NOW);
+      const inv = inventory(p, L, scope, NOW);
+      assert.equal(m.pins.reduce((n, x) => n + x.usable, 0), inv.reduce((n, i) => n + i.available, 0), scope);
+      assert.equal(m.pins.reduce((n, x) => n + x.custody, 0), inv.reduce((n, i) => n + i.custody, 0), scope);
+      assert.deepEqual(m.unplaced, []);
+    }
+  });
+
+  it('shows hub countries, the open Germany → USA shipment, and the missing unit in Germany', async () => {
+    const { mapData } = await import('../src/app/model');
+    const m = mapData(p, L, 'ALL', NOW);
+    assert.deepEqual(m.pins.map((x) => x.country), ['Germany', 'Philippines', 'Poland', 'United States of America']);
+    assert.ok(m.pins.find((x) => x.country === 'Germany')!.isHubCountry);
+    assert.deepEqual(m.links, [{ from: 'Germany', to: 'United States of America', qty: 5, shipments: 1 }]);
+    assert.equal(m.pins.find((x) => x.country === 'Germany')!.missing, 1);
+    assert.equal(m.pins.find((x) => x.country === 'Philippines')!.custody > 0, true);
+  });
+});

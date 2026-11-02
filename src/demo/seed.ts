@@ -21,15 +21,15 @@ export function demoGtin(n: number): string {
 }
 
 const locations: Location[] = [
-  { id: HUB_HI, name: 'Hawaii Hub', kind: 'HUB', timeZone: 'Pacific/Honolulu' },
+  { id: HUB_HI, name: 'Hawaii Hub', kind: 'HUB', timeZone: 'Pacific/Honolulu', country: 'United States of America' },
   { id: 'HI-PHARM', name: 'Hawaii Hub · Pharmacy cage', kind: 'STORAGE', parentId: HUB_HI },
   { id: 'HI-WH', name: 'Hawaii Hub · Warehouse bay 3', kind: 'STORAGE', parentId: HUB_HI },
-  { id: 'SITE-KOA', name: 'Exercise Site Koa', kind: 'DEPLOYMENT_SITE', parentId: HUB_HI, custodianId: 'p-reyes' },
+  { id: 'SITE-KOA', name: 'Exercise Site Koa', kind: 'DEPLOYMENT_SITE', parentId: HUB_HI, custodianId: 'p-reyes', country: 'Philippines' },
   { id: 'KIT-KOA-1', name: 'Koa trauma kit 1', kind: 'KIT', parentId: 'SITE-KOA', custodianId: 'p-tanaka' },
-  { id: HUB_DE, name: 'Germany Hub', kind: 'HUB', timeZone: 'Europe/Berlin' },
+  { id: HUB_DE, name: 'Germany Hub', kind: 'HUB', timeZone: 'Europe/Berlin', country: 'Germany' },
   { id: 'DE-PHARM', name: 'Germany Hub · Pharmacy cage', kind: 'STORAGE', parentId: HUB_DE },
   { id: 'DE-WH', name: 'Germany Hub · Warehouse hall B', kind: 'STORAGE', parentId: HUB_DE },
-  { id: 'SITE-LINDE', name: 'Exercise Site Linde', kind: 'DEPLOYMENT_SITE', parentId: HUB_DE, custodianId: 'p-novak' },
+  { id: 'SITE-LINDE', name: 'Exercise Site Linde', kind: 'DEPLOYMENT_SITE', parentId: HUB_DE, custodianId: 'p-novak', country: 'Poland' },
   { id: 'KIT-LINDE-1', name: 'Linde trauma kit 1', kind: 'KIT', parentId: 'SITE-LINDE', custodianId: 'p-schmidt' },
 ];
 

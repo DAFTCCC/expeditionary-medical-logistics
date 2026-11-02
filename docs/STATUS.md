@@ -23,7 +23,7 @@ _Last updated: 2026-11-01 (field-test build)_
 | Two hubs, Hawaii + Germany (ADR-008) | Unit tested | `tests/seed.test.ts`: scoping, hub-to-hub transfers, enterprise = sum of hubs |
 | Two-hub demo seed | Unit tested | Every seed event accepted; conservation holds for every lot |
 | POC UI: dashboard, inventory by lot/expiry, transactions, equipment custody, labels, history | Browser tested (local) | Headless Chrome, 25 scripted workflow steps against the production build served locally. The live GitHub Pages site has **not** been opened by a browser yet |
-| Camera scanning (zxing-wasm, bundled WASM) | Browser tested (decoder only) | Decoding verified from an image file in Chrome. **Live camera not tested** — needs a real device |
+| Camera scanning (zxing-wasm, bundled WASM) | Browser tested (fake camera) | Live camera loop decodes QR and GS1 DataMatrix in Chrome with a simulated camera. User reported the camera not opening on their phone (2026-11-01) — fixes and diagnostics shipped, awaiting re-test |
 | QR label generation | Browser tested | QR rendered, then decoded back by the scanner |
 | DataMatrix label generation (incl. GS1) | Browser tested (local) | Generated, then decoded by the camera reader |
 | Handheld scanner (keyboard wedge) | Browser tested (simulated keystrokes) | **No physical scanner tested**; GS separator substitutes configurable |
@@ -32,6 +32,8 @@ _Last updated: 2026-11-01 (field-test build)_
 | Quarantine / witnessed disposal / missing-report screens | Browser tested (local) | |
 | Own field-test data: start blank, edit items/locations/people, register equipment | Unit + browser tested (local) | Reference edits never rewrite history (core `replay()`) |
 | Backup export / restore | Browser tested (local) | Replaces device data; no merge |
+| Country-level map (ADR-009) | Unit + browser tested (local) | Totals match inventory per scope; offline bundled map |
+| Camera troubleshooting (in-app browser, blocked permission, fallbacks) | Unit + browser tested (Chrome fake camera) | Live decode of QR and GS1 DataMatrix through the camera path verified with a fake camera. **Not yet verified on a real phone** |
 | Server, auth, sync | Designed (ADR-004) | Phase 2–3 |
 
 ## Known limitations / blockers

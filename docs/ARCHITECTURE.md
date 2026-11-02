@@ -104,3 +104,13 @@ _Status: accepted 2026-11-01 (hubs confirmed by the product owner). Supersedes t
 - Two optional fields were added to the core types: `Location.timeZone` and `Person.homeLocationId`. Ledger rules are unchanged; all existing tests still pass.
 - Demo data seeds both hubs, each with storage, a supported deployment site, people, equipment and lots, plus a completed Hawaii → Germany transfer with a shortfall and an open Germany → Hawaii shipment.
 - Per-hub permissions (e.g., a Germany manager may not record at Hawaii) are **not** enforced yet; roles apply enterprise-wide in the POC.
+
+## ADR-009 — Country-level map, no coordinates
+
+_Status: accepted 2026-11-01 (requested by the product owner: "a pin in a country, not necessarily a specific location")._
+
+**Decision.** Locations may carry a `country` (the Natural Earth map name, e.g. "Germany"). Child locations inherit it from the nearest ancestor, so setting it on hubs and deployment sites is enough. The Map screen shows one pin per country, placed at the centre of the country's largest landmass, sized by stock and coloured by problems (missing or expired stock; equipment or quarantine to check). Shipments in transit between countries are drawn as dashed lines. Per-country totals are computed by the same projection as everything else and are unit-tested to match the inventory totals in every hub view.
+
+**No coordinates are stored or displayed.** Exact sites are never shown — useful operational-security behavior for deployment data, and it keeps the data model simple. Consequence: a hub in Hawaii appears on the US mainland pin, because the pin is at the centre of the country, not the state.
+
+**Offline.** The map (Natural Earth 1:50m via `world-atlas`, 241 countries and territories incl. Guam, Bahrain, Djibouti, Singapore) is bundled and lazily loaded with the Map screen (~245 KB gzipped) and pre-cached by the service worker. No map tiles or external services are used.

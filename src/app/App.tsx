@@ -11,10 +11,13 @@ import { LabelsPage } from './pages/Labels';
 import { HistoryPage } from './pages/History';
 import { AboutPage } from './pages/About';
 import { SetupPage } from './pages/Setup';
+import { lazy, Suspense } from 'react';
+const MapPage = lazy(() => import('./pages/Map').then((m) => ({ default: m.MapPage })));
 
 const NAV: [string, string][] = [
   ['', 'Dashboard'],
   ['inventory', 'Inventory'],
+  ['map', 'Map'],
   ['scan', 'Scan'],
   ['act', 'Transact'],
   ['equipment', 'Equipment'],
@@ -48,6 +51,7 @@ export function App() {
     case 'equipment': page = <EquipmentPage focus={params.get('asset') ?? undefined} />; break;
     case 'labels': page = <LabelsPage params={params} />; break;
     case 'history': page = <HistoryPage params={params} />; break;
+    case 'map': page = <Suspense fallback={<p className="empty">Loading map…</p>}><MapPage /></Suspense>; break;
     case 'setup': page = <SetupPage params={params} />; break;
     case 'about': page = <AboutPage />; break;
     default: page = <p className="empty">Page not found. <a href="#/">Go to the dashboard</a>.</p>;

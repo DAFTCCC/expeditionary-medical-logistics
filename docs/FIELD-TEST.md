@@ -23,5 +23,15 @@ FieldLine is for **logistics data only** — stock, lots, expiry, custody, equip
 
 Record problems with what you tapped, what you expected, and a screenshot. Export a backup when something looks wrong so it can be reproduced.
 
+## If the camera won't open
+- Use the **Camera** tab on Scan and tap **Start camera** (allow access when asked).
+- Opened the link from another app (email, chat, Facebook…)? Those built-in browsers usually block the camera — open the page in **Safari** (iPhone) or **Chrome** (Android). The app warns you and has a Copy link button.
+- Blocked earlier? The app shows the exact steps for your phone. iPhone: Safari “aA” → Website Settings → Camera → Allow (installed app: Settings → FieldLine/Safari → Camera).
+- **Scan from photo** works almost everywhere, using the phone's normal camera.
+- Still stuck: open **Camera check** at the bottom of the Scan page and send a screenshot.
+
+## Map
+Set a **country** on each hub and deployment site (Setup → Locations); storage areas and kits inherit it. The Map shows one pin per country — never the exact site.
+
 ## Known limits
 No sign-in (“Acting as” is a switch); witnesses are selected not authenticated; roles are not per hub; no box → each conversions; no sync. See docs/STATUS.md.

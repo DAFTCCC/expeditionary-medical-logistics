@@ -1,4 +1,4 @@
-import { useState, type FormEvent, type ReactElement } from 'react';
+import { useEffect, useState, type FormEvent, type ReactElement } from 'react';
 import { ROLE_LABEL } from '../../core/permissions';
 import type { CatalogItem, ItemCategory, Location, LocationKind, Person, Role } from '../../core/types';
 import { normalizeGtin, referencedIds, shortId } from '../reference';
@@ -148,7 +148,7 @@ function LocationsTab() {
   const tree = (parent: string | undefined, depth: number): ReactElement[] =>
     ref.locations.filter((l) => l.parentId === parent).flatMap((l) => [
       <li key={l.id} style={{ paddingLeft: depth * 18 }}>
-        <strong>{l.name}</strong> <span className="sub">{KIND_LABEL[l.kind]}{l.timeZone ? ` · ${l.timeZone}` : ''}{l.custodianId ? ` · custodian ${L.personName(l.custodianId)}` : ''}</span>{' '}
+        <strong>{l.name}</strong> <span className="sub">{KIND_LABEL[l.kind]}{l.country ? ` · ${l.country}` : ''}{l.timeZone ? ` · ${l.timeZone}` : ''}{l.custodianId ? ` · custodian ${L.personName(l.custodianId)}` : ''}</span>{' '}
         <button className="link" onClick={() => { setEdit(l); setOutcome(null); }}>Edit</button>{' '}
         {!used.has(l.id) && !ref.locations.some((c) => c.parentId === l.id) && !ref.people.some((x) => x.homeLocationId === l.id) && <button className="link danger" onClick={() => remove(l)}>Remove</button>}
       </li>,
@@ -172,11 +172,21 @@ function LocationForm({ loc, onDone, save }: { loc?: Location; onDone: () => voi
   const [parent, setParent] = useState(loc?.parentId ?? ref.locations.find((l) => l.kind === 'HUB')?.id ?? '');
   const [tz, setTz] = useState(loc?.timeZone ?? '');
   const [custodian, setCustodian] = useState(loc?.custodianId ?? '');
+  const [country, setCountry] = useState(loc?.country ?? '');
+  const [names, setNames] = useState<string[]>([]);
+  const [err, setErr] = useState('');
+  useEffect(() => { void import('../world').then((w) => setNames(w.COUNTRY_NAMES)); }, []);
+  const { L } = useStore();
+  const inherited = kind !== 'HUB' && parent ? L.countryOf(parent) : undefined;
   const submit = async (e: FormEvent) => {
     e.preventDefault();
+    setErr('');
+    const c = country.trim();
+    if (c && names.length && !names.includes(c)) return setErr(`“${c}” is not on the map. Pick a country from the list.`);
     const next: Location = {
       ...(loc ?? { id: shortId('loc') }), name: name.trim(), kind,
       parentId: kind === 'HUB' ? undefined : parent, timeZone: kind === 'HUB' ? tz.trim() || undefined : undefined, custodianId: custodian || undefined,
+      country: c || undefined,
     };
     const ok = await save((r) => ({ ...r, locations: loc ? r.locations.map((x) => (x.id === loc.id ? next : x)) : [...r.locations, next] }), `${next.name} ${loc ? 'updated' : 'added'}.`);
     if (ok) onDone();
@@ -203,12 +213,17 @@ function LocationForm({ loc, onDone, save }: { loc?: Location; onDone: () => voi
             </select>
           </Field>
         )}
+        <Field label="Country (for the map)" hint={inherited && !country ? `Leave blank to use ${inherited} from the location it sits in. Only the country is shown — never the exact site.` : 'Only the country is shown on the map — never the exact site.'}>
+          <input list="countries" value={country} onChange={(e) => setCountry(e.target.value)} placeholder={inherited ?? 'e.g. Germany'} />
+          <datalist id="countries">{names.map((n) => <option key={n} value={n} />)}</datalist>
+        </Field>
         <Field label="Accountable custodian (optional)">
           <select value={custodian} onChange={(e) => setCustodian(e.target.value)}>
             <option value="">— none —</option>
             {ref.people.map((x) => <option key={x.id} value={x.id}>{x.displayName}</option>)}
           </select>
         </Field>
+        {err && <div className="banner bad"><span>{err}</span></div>}
         <div className="actions-row"><button className="btn primary" type="submit">{loc ? 'Save changes' : 'Add location'}</button><button className="btn secondary" type="button" onClick={onDone}>Cancel</button></div>
       </form>
     </Section>

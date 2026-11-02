@@ -97,12 +97,12 @@ export function validateReference(ref: ReferenceData, events: LedgerEvent[] = []
 
 export interface BlankSetup {
   yourName: string;
-  hubs: { name: string; timeZone: string }[];
+  hubs: { name: string; timeZone: string; country?: string }[];
 }
 
 /** Minimal starting reference data for a user's own field test. */
 export function blankReference(s: BlankSetup): ReferenceData {
-  const hubs = s.hubs.filter((h) => h.name.trim()).map((h) => ({ id: shortId('hub'), name: h.name.trim(), kind: 'HUB' as const, timeZone: h.timeZone || undefined }));
+  const hubs = s.hubs.filter((h) => h.name.trim()).map((h) => ({ id: shortId('hub'), name: h.name.trim(), kind: 'HUB' as const, timeZone: h.timeZone || undefined, country: h.country || undefined }));
   return {
     locations: hubs,
     people: [{ id: shortId('per'), displayName: s.yourName.trim() || 'Me', role: 'HUB_LOGISTICS_MANAGER', medicationAuthority: true, homeLocationId: hubs[0]?.id }],

@@ -46,6 +46,11 @@ export interface Location {
   custodianId?: string;
   /** IANA time zone used for local display at this location (ADR-008). Storage is always UTC. */
   timeZone?: string;
+  /**
+   * Country (map name, e.g. "Germany") for the country-level map (ADR-009). Inherited by
+   * child locations. Deliberately no coordinates: nothing finer than a country is stored.
+   */
+  country?: string;
 }
 
 export type ItemCategory = 'MEDICATION' | 'CONSUMABLE';

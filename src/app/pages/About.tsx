@@ -87,8 +87,8 @@ function StartOwn() {
   const s = useStore();
   const [name, setName] = useState('');
   const [hubs, setHubs] = useState([
-    { on: true, name: 'Hawaii Hub', timeZone: 'Pacific/Honolulu' },
-    { on: true, name: 'Germany Hub', timeZone: 'Europe/Berlin' },
+    { on: true, name: 'Hawaii Hub', timeZone: 'Pacific/Honolulu', country: 'United States of America' },
+    { on: true, name: 'Germany Hub', timeZone: 'Europe/Berlin', country: 'Germany' },
   ]);
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);

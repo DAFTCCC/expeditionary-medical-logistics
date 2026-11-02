@@ -48,6 +48,17 @@ export class Lookup {
     }
     return undefined;
   }
+  /** Country of a location, inherited from the nearest ancestor that has one. */
+  countryOf(id: string | undefined): string | undefined {
+    const seen = new Set<string>();
+    let cur = id ? this.locations.get(id) : undefined;
+    while (cur && !seen.has(cur.id)) {
+      if (cur.country) return cur.country;
+      seen.add(cur.id);
+      cur = cur.parentId ? this.locations.get(cur.parentId) : undefined;
+    }
+    return undefined;
+  }
   hubOfPerson(id: string): string | undefined {
     return this.hubOfLocation(this.people.get(id)?.homeLocationId);
   }
@@ -315,6 +326,76 @@ export function labelTargetName(p: Projection, L: Lookup, type: string, id: stri
   if (type === 'ASSET') return assetName(p, id);
   if (type === 'LOCATION') return L.locationName(id);
   return L.items.get(id)?.name ?? id;
+}
+
+// --------------------------------------------------------------- map
+
+export interface CountryPin {
+  country: string;
+  hubs: string[]; // hub ids with locations in this country
+  locations: Location[];
+  usable: number; // available, not expired
+  custody: number; // held by people based in this country
+  inbound: number; // in transit to locations in this country
+  quarantine: number;
+  missing: number;
+  expiredOnShelf: number;
+  equipment: number;
+  equipmentAttention: number; // not operational, or not confirmed in 30 days
+  isHubCountry: boolean;
+}
+
+export interface CountryLink { from: string; to: string; qty: number; shipments: number }
+
+export function mapData(p: Projection, L: Lookup, scope: Scope, now: Date = new Date()): { pins: CountryPin[]; links: CountryLink[]; unplaced: Location[] } {
+  const pins = new Map<string, CountryPin>();
+  const pin = (c: string) => {
+    let x = pins.get(c);
+    if (!x) pins.set(c, (x = { country: c, hubs: [], locations: [], usable: 0, custody: 0, inbound: 0, quarantine: 0, missing: 0, expiredOnShelf: 0, equipment: 0, equipmentAttention: 0, isHubCountry: false }));
+    return x;
+  };
+  const unplaced: Location[] = [];
+  for (const l of L.locationsInScope(scope)) {
+    const c = L.countryOf(l.id);
+    if (!c) { unplaced.push(l); continue; }
+    const x = pin(c);
+    x.locations.push(l);
+    const hub = L.hubOfLocation(l.id);
+    if (hub && !x.hubs.includes(hub)) x.hubs.push(hub);
+    if (l.kind === 'HUB') x.isHubCountry = true;
+  }
+  for (const r of rowsInScope(p, L, scope)) {
+    const c = r.bucket === 'CUSTODY' ? L.countryOf(L.people.get(r.holderId)?.homeLocationId) : L.countryOf(r.holderId);
+    if (!c) continue;
+    const lot = p.lots.get(r.lotId);
+    const expired = lot ? expiryState(lot, now) === 'EXPIRED' : false;
+    const x = pin(c);
+    if (r.bucket === 'AVAILABLE') { if (expired) x.expiredOnShelf += r.qty; else x.usable += r.qty; }
+    else if (r.bucket === 'CUSTODY') x.custody += r.qty;
+    else if (r.bucket === 'IN_TRANSIT') x.inbound += r.qty;
+    else if (r.bucket === 'QUARANTINE') x.quarantine += r.qty;
+    else if (r.bucket === 'MISSING') x.missing += r.qty;
+  }
+  for (const a of p.assets.values()) {
+    if (a.status === 'RETIRED' || !L.inScope(scope, L.hubOfLocation(a.locationId))) continue;
+    const c = L.countryOf(a.locationId);
+    if (!c) continue;
+    const x = pin(c);
+    x.equipment++;
+    if (a.status !== 'OPERATIONAL' || (now.getTime() - Date.parse(a.lastConfirmedAt)) / 86_400_000 > CONFIRM_OVERDUE_DAYS) x.equipmentAttention++;
+  }
+  const links = new Map<string, CountryLink>();
+  for (const s of p.shipments.values()) {
+    if (s.remaining <= 0) continue;
+    if (!L.inScope(scope, L.hubOfLocation(s.toLocationId)) && !L.inScope(scope, L.hubOfLocation(s.fromLocationId))) continue;
+    const from = L.countryOf(s.fromLocationId), to = L.countryOf(s.toLocationId);
+    if (!from || !to || from === to) continue;
+    const k = `${from}→${to}`;
+    const x = links.get(k) ?? { from, to, qty: 0, shipments: 0 };
+    x.qty += s.remaining; x.shipments++;
+    links.set(k, x);
+  }
+  return { pins: [...pins.values()].sort((a, b) => a.country.localeCompare(b.country)), links: [...links.values()], unplaced };
 }
 
 export { totalsFor };

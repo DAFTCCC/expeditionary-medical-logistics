@@ -278,6 +278,14 @@ with sync_playwright() as pw:
         return t
     step('Lot detail conservation check passes after all transactions', lot_page)
 
+    def demo_map():
+        nav('map'); page.wait_for_selector('svg.worldmap .pin', timeout=15000)
+        labels = sorted(page.eval_on_selector_all('text.pin-label', 'els => els.map(e => e.textContent)'))
+        assert labels == ['Germany', 'Philippines', 'Poland', 'United States'], labels
+        rows = page.locator('table tbody tr').count()
+        return f'{len(labels)} country pins, {rows} rows in the by-country table'
+    step('Map shows demo stock by country', demo_map)
+
     def mobile():
         m = browser.new_context(viewport={'width': 390, 'height': 844}, device_scale_factor=2, is_mobile=True, has_touch=True)
         mp = m.new_page()

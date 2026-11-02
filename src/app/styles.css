@@ -209,3 +209,33 @@ details summary { cursor: pointer; margin-top: 10px; }
 .btn.big { min-height: 52px; font-size: 1.05rem; padding: 10px 22px; }
 .diag ul { margin: 6px 0; padding-left: 18px; }
 .diag .ua { display: block; font-size: 0.7rem; color: var(--ink-2); margin-top: 4px; }
+
+.map-card { padding: 10px; }
+.map-tools { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 16px; align-items: center; margin-bottom: 6px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
+.seg button { background: var(--card); color: var(--ink-2); border: none; padding: 8px 12px; font: inherit; font-weight: 600; font-size: 0.85rem; cursor: pointer; min-height: 40px; }
+.seg button.on { background: var(--navy); color: #fff; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 0.78rem; color: var(--ink-2); align-items: center; }
+.legend span { display: inline-flex; align-items: center; gap: 5px; }
+.legend .dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+.legend .dot.ok { background: var(--navy-2); } .legend .dot.warn { background: #d99a12; } .legend .dot.bad { background: var(--bad); }
+.legend .ring { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--amber); display: inline-block; }
+.legend .dash { width: 18px; border-top: 2px dashed var(--navy-2); display: inline-block; }
+.worldmap { width: 100%; height: auto; display: block; touch-action: manipulation; }
+.worldmap .ocean { fill: #e6eef5; }
+.worldmap .land { fill: #d7d2c6; stroke: #fff; stroke-width: 0.4; }
+.worldmap .land.active { fill: #bfcfdc; cursor: pointer; }
+.worldmap .link { fill: none; stroke: var(--navy-2); stroke-width: 2; stroke-dasharray: 6 5; }
+.worldmap .arrowhead { fill: var(--navy-2); }
+.worldmap .pin { cursor: pointer; }
+.worldmap .pin circle { fill: var(--navy-2); stroke: #fff; stroke-width: 2; }
+.worldmap .pin.warn circle { fill: #d99a12; } .worldmap .pin.bad circle { fill: var(--bad); }
+.worldmap .pin circle.hubring { fill: none; stroke: var(--amber); stroke-width: 3; }
+.worldmap .pin.sel circle:not(.hubring) { stroke: #111; stroke-width: 3; }
+.worldmap .pin text { fill: #fff; font-size: 11px; font-weight: 700; text-anchor: middle; pointer-events: none; }
+.worldmap .pin text.pin-label { fill: var(--ink); font-size: 12px; font-weight: 650; paint-order: stroke; stroke: var(--paper); stroke-width: 3px; }
+.worldmap .pin:focus-visible { outline: none; } .worldmap .pin:focus-visible circle { stroke: var(--focus); stroke-width: 4; }
+tr.row-sel td { background: var(--info-bg); }
+@media (prefers-color-scheme: dark) {
+  .worldmap .ocean { fill: #142330; } .worldmap .land { fill: #2b3a46; stroke: #10171d; } .worldmap .land.active { fill: #3c5568; }
+}
