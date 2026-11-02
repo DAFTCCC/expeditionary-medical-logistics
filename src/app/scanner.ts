@@ -39,23 +39,17 @@ export async function detectInFile(file: File): Promise<Detected | undefined> {
 
 export interface CameraSession { stop: () => void }
 
-/** Start the rear camera into `video` and call onFound once with the first barcode. */
-export async function startCamera(video: HTMLVideoElement, onFound: (d: Detected) => void, onError: (msg: string) => void): Promise<CameraSession> {
-  if (!window.isSecureContext) throw new Error('The camera needs a secure (https) page.');
-  if (!navigator.mediaDevices?.getUserMedia) throw new Error('This browser does not offer camera access.');
-  let stream: MediaStream;
-  try {
-    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
-  } catch (e) {
-    const name = (e as DOMException).name;
-    if (name === 'NotAllowedError') throw new Error('Camera permission was denied. Allow it in the browser’s site settings, or use handheld or manual entry.');
-    if (name === 'NotFoundError' || name === 'OverconstrainedError') throw new Error('No camera was found on this device.');
-    throw new Error(`Could not start the camera (${name || (e as Error).message}).`);
-  }
-  video.srcObject = stream;
-  video.setAttribute('playsinline', 'true');
+/** Attach an already-opened camera stream to `video` and call onFound once with the first barcode. */
+export async function startScanning(video: HTMLVideoElement, stream: MediaStream, onFound: (d: Detected) => void, onError: (msg: string) => void): Promise<CameraSession> {
+  video.setAttribute('playsinline', 'true'); // iOS: must be set before play or video goes fullscreen / stays black
   video.muted = true;
-  await video.play();
+  video.srcObject = stream;
+  try {
+    await video.play();
+  } catch (e) {
+    stream.getTracks().forEach((t) => t.stop());
+    throw new Error(`The camera opened but the preview could not play (${(e as Error).message}).`);
+  }
 
   let stopped = false;
   let busy = false;

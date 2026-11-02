@@ -5,6 +5,7 @@ import { BUCKET_LABEL, todayUTC } from '../model';
 import { loadPref, savePref, useStore } from '../store';
 import { ExpiryBadge, Field, href, Time, useSession } from '../ui';
 import type { CameraSession, Detected } from '../scanner';
+import { allowCameraSteps, CameraError, cameraEnv, openCamera, type CameraEnv } from '../camera';
 
 type Mode = 'camera' | 'handheld' | 'manual';
 
@@ -16,7 +17,7 @@ const SEPARATORS: [string, string][] = [
 ];
 
 export function ScanPage() {
-  const [mode, setMode] = useState<Mode>(() => (loadPref('scanMode', 'handheld') as Mode));
+  const [mode, setMode] = useState<Mode>(() => (loadPref('scanMode', navigator.maxTouchPoints > 0 ? 'camera' : 'handheld') as Mode));
   const [last, setLast] = useState<{ raw: string; source: string; format?: string } | null>(null);
   const [sep, setSep] = useState(() => loadPref('gsSep', ''));
   const pick = (m: Mode) => { setMode(m); savePref('scanMode', m); };
@@ -56,21 +57,38 @@ export function ScanPage() {
 function CameraMode({ onResult }: { onResult: (d: Detected) => void }) {
   const video = useRef<HTMLVideoElement>(null);
   const session = useRef<CameraSession | null>(null);
+  const [env, setEnv] = useState<CameraEnv | null>(null);
   const [state, setState] = useState<'idle' | 'starting' | 'live' | 'error'>('idle');
-  const [msg, setMsg] = useState('');
+  const [err, setErr] = useState<{ text: string; kind: CameraError['kind'] | 'decoder' } | null>(null);
   const [fileMsg, setFileMsg] = useState('');
+  const [copied, setCopied] = useState(false);
 
+  useEffect(() => {
+    void cameraEnv().then(setEnv);
+    void import('../scanner'); // warm the decoder so it is ready when the camera starts
+  }, []);
   const stop = () => { session.current?.stop(); session.current = null; setState('idle'); };
   useEffect(() => stop, []);
 
   const start = async () => {
-    setState('starting'); setMsg('');
+    if (!env) return;
+    setState('starting'); setErr(null);
+    let stream: MediaStream;
     try {
-      const { startCamera } = await import('../scanner');
-      session.current = await startCamera(video.current!, (d) => { setState('idle'); session.current = null; onResult(d); }, setMsg);
+      stream = await openCamera(env); // straight from the tap — some phone browsers require it
+    } catch (e) {
+      setState('error');
+      setErr({ text: (e as Error).message, kind: e instanceof CameraError ? e.kind : 'other' });
+      void cameraEnv().then(setEnv);
+      return;
+    }
+    try {
+      const { startScanning } = await import('../scanner');
+      session.current = await startScanning(video.current!, stream, (d) => { setState('idle'); session.current = null; onResult(d); }, (m) => setErr({ text: m, kind: 'decoder' }));
       setState('live');
     } catch (e) {
-      setState('error'); setMsg((e as Error).message);
+      stream.getTracks().forEach((t) => t.stop());
+      setState('error'); setErr({ text: (e as Error).message, kind: 'other' });
     }
   };
 
@@ -80,29 +98,74 @@ function CameraMode({ onResult }: { onResult: (d: Detected) => void }) {
     try {
       const { detectInFile } = await import('../scanner');
       const d = await detectInFile(f);
-      if (d) { setFileMsg(''); onResult(d); } else setFileMsg('No barcode found in that image. Try a sharper, closer photo.');
+      if (d) { setFileMsg(''); onResult(d); } else setFileMsg('No barcode found in that photo. Hold the phone 10–20 cm away, fill the frame, avoid glare, and try again.');
     } catch (e) {
-      setFileMsg(`Could not read image: ${(e as Error).message}`);
+      setFileMsg(`Could not read the photo: ${(e as Error).message}`);
     }
   };
 
+  const copyLink = async () => {
+    try { await navigator.clipboard.writeText(location.href.split('#')[0]); setCopied(true); } catch { setCopied(false); }
+  };
+
+  const inApp = env?.inAppBrowser;
+  const blocked = env?.permission === 'denied';
+  const steps = env ? allowCameraSteps(env) : [];
+  const realBrowser = env?.platform === 'ios' ? 'Safari' : env?.platform === 'android' ? 'Chrome' : 'your browser';
+
   return (
     <div className="camera">
+      {inApp && state !== 'live' && (
+        <div className="banner bad cam-help" role="alert">
+          <strong>Open in {realBrowser} to use the camera</strong>
+          <span>This page is open inside {inApp}. Built-in app browsers usually block the camera. Use the menu (⋯ or ⋮) → “Open in {realBrowser}”, or copy the link and paste it into {realBrowser}.</span>
+          <button className="btn small" onClick={() => void copyLink()}>{copied ? 'Link copied ✓' : 'Copy link'}</button>
+        </div>
+      )}
+      {!inApp && blocked && state !== 'live' && (
+        <div className="banner bad cam-help" role="alert">
+          <strong>Camera is blocked for this site</strong>
+          <ol>{steps.map((t) => <li key={t}>{t}</li>)}</ol>
+        </div>
+      )}
       <div className={`viewfinder ${state === 'live' ? 'live' : ''}`}>
-        <video ref={video} aria-label="Camera preview" />
-        {state !== 'live' && <span className="vf-hint">{state === 'starting' ? 'Starting camera…' : 'Camera off'}</span>}
+        <video ref={video} aria-label="Camera preview" playsInline muted autoPlay />
+        {state !== 'live' && <span className="vf-hint">{state === 'starting' ? 'Starting camera… allow access if your phone asks' : 'Camera off'}</span>}
         {state === 'live' && <span className="vf-frame" aria-hidden />}
       </div>
       <div className="actions-row">
-        {state === 'live' ? <button className="btn" onClick={stop}>Stop camera</button> : <button className="btn primary" onClick={start} disabled={state === 'starting'}>Start camera</button>}
+        {state === 'live'
+          ? <button className="btn" onClick={stop}>Stop camera</button>
+          : <button className="btn primary big" onClick={() => void start()} disabled={state === 'starting' || !env}>Start camera</button>}
         <label className="btn secondary file-btn">
           Scan from photo
           <input type="file" accept="image/*" capture="environment" onChange={(e) => { void fromFile(e.target.files?.[0]); e.target.value = ''; }} />
         </label>
       </div>
-      {msg && <p className="banner bad"><span>{msg}</span></p>}
+      {err && (
+        <div className="banner bad cam-help" role="alert">
+          <strong>Camera didn’t start</strong>
+          <span>{err.text}</span>
+          {err.kind === 'denied' && <ol>{steps.map((t) => <li key={t}>{t}</li>)}</ol>}
+          {err.kind === 'in-app' && <span>Open this page in {realBrowser} instead (menu → “Open in {realBrowser}”).</span>}
+          {err.kind !== 'decoder' && <span>Meanwhile, <strong>Scan from photo</strong> uses your phone’s normal camera and works in almost every browser.</span>}
+        </div>
+      )}
       {fileMsg && <p className="sub">{fileMsg}</p>}
-      <p className="hint">Reads QR, DataMatrix (incl. GS1), Code 128, EAN/UPC. Decoding runs on this device; images are not uploaded.</p>
+      <p className="hint">Reads QR, DataMatrix (incl. GS1 on drug packaging), Code 128, EAN/UPC. Decoding happens on this device; nothing is uploaded.</p>
+      {env && (
+        <details className="sub diag">
+          <summary>Camera check</summary>
+          <ul>
+            <li>Secure page: {env.secure ? 'yes' : 'NO'}</li>
+            <li>Browser allows camera from web pages: {env.hasApi ? 'yes' : 'NO'}</li>
+            <li>Opened inside another app: {env.inAppBrowser ?? 'no'}</li>
+            <li>Camera permission: {env.permission}</li>
+            <li>Installed app mode: {env.standalone ? 'yes' : 'no'} · device: {env.platform}</li>
+          </ul>
+          <code className="ua">{navigator.userAgent}</code>
+        </details>
+      )}
     </div>
   );
 }
